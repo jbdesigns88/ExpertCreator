@@ -53,3 +53,11 @@ npm run preview
 ```
 
 The build command type-checks the project and compiles the production bundle.
+
+## Testing
+
+```bash
+npm run test
+```
+
+Runs the Vitest suite with coverage reporting to validate study plan generation, ranking logic, and shared utilities.
