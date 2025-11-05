@@ -72,6 +72,11 @@ const DEFAULT_TOPICS: TopicId[] = ["oauth", "rag", "node", "system"];
 const MAX_WEEKS = 12;
 const MIN_WEEKS = 1;
 
+const ENV_ASSISTANT_API_KEY = import.meta.env.VITE_ASSISTANT_API_KEY?.trim();
+const DEFAULT_ASSISTANT_SETTINGS: AssistantSettings = ENV_ASSISTANT_API_KEY
+  ? { apiKey: ENV_ASSISTANT_API_KEY }
+  : {};
+
 function App() {
   const [handles, setHandles] = useState<DatabaseHandles | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +94,7 @@ function App() {
   }>({ open: false, session: null, mode: "diagnostic" });
   const [feedback, setFeedback] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [assistantSettings, setAssistantSettings] = useState<AssistantSettings>({});
+  const [assistantSettings, setAssistantSettings] = useState<AssistantSettings>(DEFAULT_ASSISTANT_SETTINGS);
   const [pace, setPace] = useState<StudyPace>("balanced");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
