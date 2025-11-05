@@ -761,10 +761,10 @@ function App() {
                               </div>
                               <div className="flex flex-col items-start gap-2 md:items-end">
                                 <div className="flex gap-2">
-                                  <Button variant="outline" size="sm" onClick={() => openQuiz(session, "diagnostic")">
+                                  <Button variant="outline" size="sm" onClick={() => openQuiz(session, "diagnostic")}>
                                     <FlaskConical className="mr-2 h-4 w-4" /> Diagnostic
                                   </Button>
-                                  <Button variant="default" size="sm" onClick={() => openQuiz(session, "assessment")">
+                                  <Button variant="default" size="sm" onClick={() => openQuiz(session, "assessment")}>
                                     <TestTube className="mr-2 h-4 w-4" /> Test
                                   </Button>
                                 </div>
