@@ -794,13 +794,13 @@ function App() {
                                 </Button>
                               </div>
                             </div>
-                            <div className="mt-4 grid gap-3 md:grid-cols-2">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Resources
-                                </p>
-                                <ul className="mt-2 space-y-1 text-sm">
-                                  {session.focus.resources.map((resource) => (
+                              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Resources
+                                  </p>
+                                  <ul className="mt-2 space-y-1 text-sm">
+                                    {session.focus.resources.map((resource) => (
                                     <li key={resource.url}>
                                       <a
                                         href={resource.url}
@@ -813,35 +813,99 @@ function App() {
                                     </li>
                                   ))}
                                 </ul>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                                  Study Plan
-                                </p>
-                                {weaknesses.length ? (
-                                  <ul className="mt-2 space-y-2 text-sm text-slate-600">
-                                    {weaknesses.map((weakness) => (
-                                      <li key={weakness.question} className="rounded-xl bg-amber-50 p-3">
-                                        <p className="font-semibold text-amber-700">{weakness.question}</p>
-                                        <p className="text-xs text-amber-700">{weakness.rationale}</p>
-                                        <a
-                                          href={weakness.docLink}
-                                          className="mt-1 inline-flex text-xs text-indigo-500 underline"
-                                          target="_blank"
-                                          rel="noreferrer"
-                                        >
-                                          Review reference
-                                        </a>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                ) : (
-                                  <p className="mt-2 text-sm text-slate-500">
-                                    Complete the assessment to generate a targeted study plan.
+                                </div>
+                                <div>
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    In-App Lesson
                                   </p>
-                                )}
+                                  <div className="mt-2 space-y-3 text-sm text-slate-600">
+                                    <p className="text-slate-600">{session.studyGuide.overview}</p>
+                                    {session.studyGuide.objectives.length > 0 && (
+                                      <div>
+                                        <p className="font-semibold text-slate-700">Session Objectives</p>
+                                        <ul className="mt-1 ml-4 list-disc space-y-1">
+                                          {session.studyGuide.objectives.map((objective) => (
+                                            <li key={objective}>{objective}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    {session.studyGuide.sections.length > 0 && (
+                                      <div className="space-y-2">
+                                        {session.studyGuide.sections.map((section) => (
+                                          <div key={section.title} className="rounded-xl bg-white/70 p-3 shadow-inner">
+                                            <p className="font-semibold text-slate-700">{section.title}</p>
+                                            <p className="mt-1 text-slate-600">{section.detail}</p>
+                                            {section.bullets && section.bullets.length > 0 && (
+                                              <ul className="mt-2 ml-4 list-disc space-y-1">
+                                                {section.bullets.map((item) => (
+                                                  <li key={item}>{item}</li>
+                                                ))}
+                                              </ul>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                    {session.studyGuide.practice.length > 0 && (
+                                      <div>
+                                        <p className="font-semibold text-slate-700">Hands-on Practice</p>
+                                        <div className="mt-2 space-y-2">
+                                          {session.studyGuide.practice.map((drill) => (
+                                            <div key={drill.title} className="rounded-xl bg-indigo-50/60 p-3">
+                                              <p className="font-semibold text-indigo-700">{drill.title}</p>
+                                              <ul className="mt-1 ml-4 list-disc space-y-1 text-indigo-700">
+                                                {drill.steps.map((step) => (
+                                                  <li key={step}>{step}</li>
+                                                ))}
+                                              </ul>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                    {session.studyGuide.reflection.length > 0 && (
+                                      <div>
+                                        <p className="font-semibold text-slate-700">Reflection Prompts</p>
+                                        <ul className="mt-1 ml-4 list-disc space-y-1">
+                                          {session.studyGuide.reflection.map((prompt) => (
+                                            <li key={prompt}>{prompt}</li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    )}
+                                    <div className="rounded-xl bg-emerald-50/60 p-3 text-emerald-700">
+                                      <p className="font-semibold">Capstone Challenge</p>
+                                      <p className="mt-1 text-sm">{session.studyGuide.projectPrompt}</p>
+                                    </div>
+                                  </div>
+                                  <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                    Adaptive Focus
+                                  </p>
+                                  {weaknesses.length ? (
+                                    <ul className="mt-2 space-y-2 text-sm text-slate-600">
+                                      {weaknesses.map((weakness) => (
+                                        <li key={weakness.question} className="rounded-xl bg-amber-50 p-3">
+                                          <p className="font-semibold text-amber-700">{weakness.question}</p>
+                                          <p className="text-xs text-amber-700">{weakness.rationale}</p>
+                                          <a
+                                            href={weakness.docLink}
+                                            className="mt-1 inline-flex text-xs text-indigo-500 underline"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                          >
+                                            Review reference
+                                          </a>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <p className="mt-2 text-sm text-slate-500">
+                                      Complete the assessment to generate targeted remediation pointers. Use the reflection prompts above in the meantime.
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
                           </motion.div>
                         );
                       })}

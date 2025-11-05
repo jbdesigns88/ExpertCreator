@@ -1,4 +1,11 @@
-import { topics, type TopicId, type TopicConfig, type FocusArea, type QuizTemplate } from "@/data/topics";
+import {
+  topics,
+  type TopicId,
+  type TopicConfig,
+  type FocusArea,
+  type QuizTemplate,
+  type StudyGuide
+} from "@/data/topics";
 import { format } from "date-fns";
 import { safeId } from "@/lib/utils";
 
@@ -19,6 +26,7 @@ export interface SessionPlan {
   durationMinutes: number;
   summary: string;
   quiz: QuizQuestion[];
+  studyGuide: StudyGuide;
 }
 
 export interface WeekPlan {
@@ -77,8 +85,9 @@ export function generatePlan(request: PlanRequest): ExpertPlan {
         topicTitle: topic.title,
         focus,
         durationMinutes: clampSessionMinutes(hoursPerWeek, topicsConfigs.length),
-        summary: `${focus.summary} Emphasize deliberate drills for ${topic.title.toLowerCase()} fundamentals and ship a tangible artifact by the end of the session.`,
-        quiz
+        summary: `${focus.summary} ${focus.studyGuide.overview} Emphasize deliberate drills for ${topic.title.toLowerCase()} fundamentals and ship a tangible artifact by the end of the session.`,
+        quiz,
+        studyGuide: focus.studyGuide
       } satisfies SessionPlan;
     });
 
@@ -160,5 +169,36 @@ export function deserializePlan(json: string): ExpertPlan {
   if (typeof data.autoCompleteOnPass !== "boolean") {
     data.autoCompleteOnPass = true;
   }
+  data.weeksData = data.weeksData.map((week) => ({
+    ...week,
+    sessions: week.sessions.map((session) => {
+      const topic = topics.find((item) => item.id === session.topicId);
+      const focusFromCatalog = topic?.focusAreas.find((area) => area.id === session.focus.id);
+      const defaultGuide: StudyGuide =
+        session.studyGuide ??
+        focusFromCatalog?.studyGuide ?? {
+          overview: session.summary ?? "Review the provided study outline in depth.",
+          objectives: [],
+          sections: [],
+          practice: [],
+          reflection: [],
+          projectPrompt: "Draft a personal lesson outline using the available resources."
+        };
+      const resolvedFocus: FocusArea = focusFromCatalog
+        ? { ...focusFromCatalog }
+        : {
+            id: session.focus.id,
+            title: session.focus.title,
+            summary: session.focus.summary,
+            resources: session.focus.resources ?? [],
+            studyGuide: defaultGuide
+          };
+      return {
+        ...session,
+        focus: resolvedFocus,
+        studyGuide: defaultGuide
+      } satisfies SessionPlan;
+    })
+  }));
   return data;
 }
