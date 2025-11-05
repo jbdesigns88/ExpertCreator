@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   BookOpen,
   Bot,
@@ -55,6 +55,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { QuizDialog, type QuizResult } from "@/components/QuizDialog";
 import type { Weakness } from "@/components/QuizDialog";
+import LessonPage from "@/components/LessonPage";
 import { useDebouncedEffect } from "@/hooks/use-debounce";
 
 interface TestRecord {
@@ -67,6 +68,8 @@ interface TestRecord {
   mode: "diagnostic" | "assessment";
   sessionId: string;
 }
+
+type SqlExecRow = { values: unknown[][] };
 
 const DEFAULT_TOPICS: TopicId[] = ["oauth", "rag", "node", "system"];
 const MAX_WEEKS = 12;
@@ -99,6 +102,7 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
 
   useEffect(() => {
     setSpeechSupported(typeof window !== "undefined" && "speechSynthesis" in window);
@@ -122,6 +126,20 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const updateFromHash = () => {
+      const hash = window.location.hash ?? "";
+      const match = hash.match(/^#\/lesson\/(.+)$/);
+      setActiveLessonId(match ? decodeURIComponent(match[1]) : null);
+    };
+    updateFromHash();
+    window.addEventListener("hashchange", updateFromHash);
+    return () => {
+      window.removeEventListener("hashchange", updateFromHash);
+    };
+  }, []);
+
+  useEffect(() => {
     setPlan((prev) => (prev ? { ...prev, pace } : prev));
   }, [pace]);
 
@@ -138,20 +156,21 @@ function App() {
         setHoursPerWeek(restored.hoursPerWeek);
         setPace(restored.pace);
       }
-      const rankRows = db.exec("SELECT k, v FROM rank");
+      const rankRows = db.exec("SELECT k, v FROM rank") as SqlExecRow[];
       rankRows.forEach((row) => {
-        row.values.forEach(([key, value]) => {
-          if (key === "state") {
+        row.values.forEach((tuple) => {
+          const [rawKey, rawValue] = tuple as [unknown, unknown];
+          if (rawKey === "state" && typeof rawValue === "string") {
             try {
-              const parsed = JSON.parse(value as string) as RankState;
+              const parsed = JSON.parse(rawValue) as RankState;
               setRankState(parsed);
             } catch (error) {
               console.error("Failed to parse rank state", error);
             }
           }
-          if (key === "config") {
+          if (rawKey === "config" && typeof rawValue === "string") {
             try {
-              const parsed = JSON.parse(value as string) as RankConfig;
+              const parsed = JSON.parse(rawValue) as RankConfig;
               setRankConfig(parsed);
             } catch (error) {
               console.error("Failed to parse rank config", error);
@@ -161,22 +180,43 @@ function App() {
       });
       const testRows = db.exec(
         "SELECT id, taskId, score, passed, timestamp, weaknesses FROM tests ORDER BY timestamp ASC"
-      );
+      ) as SqlExecRow[];
       const restoredTests: TestRecord[] = [];
       testRows.forEach((row) => {
-        row.values.forEach(([id, taskId, score, passed, timestamp, weaknesses]) => {
+        row.values.forEach((tuple) => {
+          const [rawId, rawTaskId, rawScore, rawPassed, rawTimestamp, rawWeaknesses] = tuple as [
+            unknown,
+            unknown,
+            unknown,
+            unknown,
+            unknown,
+            unknown
+          ];
           try {
-            const parsedWeaknesses = weaknesses
-              ? (JSON.parse(weaknesses as string) as Weakness[])
+            const id = typeof rawId === "string" ? rawId : String(rawId ?? "");
+            const taskId = typeof rawTaskId === "string" ? rawTaskId : String(rawTaskId ?? "");
+            const scoreValue = typeof rawScore === "number" ? rawScore : Number(rawScore ?? 0);
+            const passedNumeric = typeof rawPassed === "number" ? rawPassed : Number(rawPassed ?? 0);
+            const timestampValue =
+              typeof rawTimestamp === "string" ? rawTimestamp : String(rawTimestamp ?? "");
+            const weaknessesPayload =
+              typeof rawWeaknesses === "string"
+                ? rawWeaknesses
+                : JSON.stringify(rawWeaknesses ?? []);
+            const parsedWeaknesses = weaknessesPayload
+              ? (JSON.parse(weaknessesPayload) as Weakness[])
               : [];
-            const mode = taskId.toString().endsWith("-assessment") ? "assessment" : "diagnostic";
-            const sessionId = taskId.toString().split("::")[0];
+            const mode = taskId.endsWith("-assessment") ? "assessment" : "diagnostic";
+            const sessionId = taskId.split("::")[0];
+            if (!id || !taskId) {
+              return;
+            }
             restoredTests.push({
-              id: id as string,
-              taskId: taskId as string,
-              score: Number(score),
-              passed: Boolean(Number(passed)),
-              timestamp: timestamp as string,
+              id,
+              taskId,
+              score: Number(scoreValue),
+              passed: Boolean(passedNumeric),
+              timestamp: timestampValue,
               weaknesses: parsedWeaknesses,
               mode,
               sessionId
@@ -226,6 +266,33 @@ function App() {
   }, [plan]);
 
   const progress = computeProgress(rankState, rankConfig);
+
+  const openLessonPage = (sessionId: string) => {
+    if (typeof window === "undefined") return;
+    const targetHash = `#/lesson/${encodeURIComponent(sessionId)}`;
+    if (window.location.hash !== targetHash) {
+      window.location.hash = targetHash;
+    } else {
+      setActiveLessonId(sessionId);
+    }
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const closeLessonPage = () => {
+    setActiveLessonId(null);
+    if (typeof window === "undefined") return;
+    const newUrl = `${window.location.pathname}${window.location.search}`;
+    window.history.replaceState(null, "", newUrl);
+    try {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      window.scrollTo(0, 0);
+    }
+  };
 
   const openQuiz = (session: SessionPlan, mode: "diagnostic" | "assessment") => {
     setQuizState({ open: true, session, mode });
@@ -431,7 +498,27 @@ function App() {
     return map;
   }, [tests]);
 
-  return (
+  const activeLesson = useMemo(() => {
+    if (!plan || !activeLessonId) return null;
+    for (const week of plan.weeksData) {
+      const session = week.sessions.find((item) => item.id === activeLessonId);
+      if (session) {
+        return { week, session } as const;
+      }
+    }
+    return null;
+  }, [plan, activeLessonId]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (activeLesson && plan) {
+      document.title = `${activeLesson.session.topicTitle} — ${activeLesson.session.focus.title} | ExpertMaker`;
+    } else {
+      document.title = "ExpertMaker";
+    }
+  }, [activeLesson, plan]);
+
+  const mainContent = (
     <div className="min-h-screen pb-16">
       <header className="sticky top-0 z-40 border-b border-indigo-100 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-4 md:flex-row md:items-center md:justify-between">
@@ -765,11 +852,14 @@ function App() {
                                 </div>
                               </div>
                               <div className="flex flex-col items-start gap-2 md:items-end">
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
+                                  <Button variant="default" size="sm" onClick={() => openLessonPage(session.id)}>
+                                    <BookOpen className="mr-2 h-4 w-4" /> Open Lesson Page
+                                  </Button>
                                   <Button variant="outline" size="sm" onClick={() => openQuiz(session, "diagnostic")}>
                                     <FlaskConical className="mr-2 h-4 w-4" /> Diagnostic
                                   </Button>
-                                  <Button variant="default" size="sm" onClick={() => openQuiz(session, "assessment")}>
+                                  <Button variant="outline" size="sm" onClick={() => openQuiz(session, "assessment")}>
                                     <TestTube className="mr-2 h-4 w-4" /> Test
                                   </Button>
                                 </div>
@@ -822,7 +912,7 @@ function App() {
                                     <p className="text-slate-600">{session.studyGuide.overview}</p>
                                     {session.studyGuide.objectives.length > 0 && (
                                       <div>
-                                        <p className="font-semibold text-slate-700">Session Objectives</p>
+                                        <p className="font-semibold text-slate-700">Key Objectives</p>
                                         <ul className="mt-1 ml-4 list-disc space-y-1">
                                           {session.studyGuide.objectives.map((objective) => (
                                             <li key={objective}>{objective}</li>
@@ -830,53 +920,11 @@ function App() {
                                         </ul>
                                       </div>
                                     )}
-                                    {session.studyGuide.sections.length > 0 && (
-                                      <div className="space-y-2">
-                                        {session.studyGuide.sections.map((section) => (
-                                          <div key={section.title} className="rounded-xl bg-white/70 p-3 shadow-inner">
-                                            <p className="font-semibold text-slate-700">{section.title}</p>
-                                            <p className="mt-1 text-slate-600">{section.detail}</p>
-                                            {section.bullets && section.bullets.length > 0 && (
-                                              <ul className="mt-2 ml-4 list-disc space-y-1">
-                                                {section.bullets.map((item) => (
-                                                  <li key={item}>{item}</li>
-                                                ))}
-                                              </ul>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-                                    {session.studyGuide.practice.length > 0 && (
-                                      <div>
-                                        <p className="font-semibold text-slate-700">Hands-on Practice</p>
-                                        <div className="mt-2 space-y-2">
-                                          {session.studyGuide.practice.map((drill) => (
-                                            <div key={drill.title} className="rounded-xl bg-indigo-50/60 p-3">
-                                              <p className="font-semibold text-indigo-700">{drill.title}</p>
-                                              <ul className="mt-1 ml-4 list-disc space-y-1 text-indigo-700">
-                                                {drill.steps.map((step) => (
-                                                  <li key={step}>{step}</li>
-                                                ))}
-                                              </ul>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-                                    {session.studyGuide.reflection.length > 0 && (
-                                      <div>
-                                        <p className="font-semibold text-slate-700">Reflection Prompts</p>
-                                        <ul className="mt-1 ml-4 list-disc space-y-1">
-                                          {session.studyGuide.reflection.map((prompt) => (
-                                            <li key={prompt}>{prompt}</li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    )}
-                                    <div className="rounded-xl bg-emerald-50/60 p-3 text-emerald-700">
-                                      <p className="font-semibold">Capstone Challenge</p>
-                                      <p className="mt-1 text-sm">{session.studyGuide.projectPrompt}</p>
+                                    <div className="rounded-xl bg-indigo-50/70 p-3 text-xs text-indigo-700">
+                                      <p className="font-semibold">Dedicated lesson page available</p>
+                                      <p className="mt-1">
+                                        Use the "Open Lesson Page" action to access step-by-step modules, practice labs, reflection prompts, and assessment guidance tailored to this session.
+                                      </p>
                                     </div>
                                   </div>
                                   <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -947,6 +995,75 @@ function App() {
           </section>
         </motion.section>
       </main>
+    </div>
+  );
+
+  let content: ReactNode = mainContent;
+
+  if (activeLessonId) {
+    if (!plan) {
+      content = (
+        <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-slate-100 pb-16">
+          <div className="mx-auto flex max-w-4xl flex-col items-center justify-center px-6 py-24 text-center">
+            <BookOpen className="h-10 w-10 text-indigo-400" />
+            <h2 className="mt-4 text-xl font-semibold text-indigo-600">Lesson loading</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Generate or import a learning plan to unlock the detailed lesson pages.
+            </p>
+            <Button className="mt-6" onClick={closeLessonPage}>
+              Return to plan setup
+            </Button>
+          </div>
+        </div>
+      );
+    } else if (activeLesson) {
+      const diagnostic = diagnosticScores.get(activeLesson.session.id);
+      const assessment = assessmentScores.get(activeLesson.session.id);
+      const weaknesses = sessionWeaknesses.get(activeLesson.session.id) ?? [];
+      content = (
+        <LessonPage
+          planTitle={plan.title}
+          session={activeLesson.session}
+          week={activeLesson.week}
+          pace={plan.pace}
+          hoursPerWeek={plan.hoursPerWeek}
+          onBack={closeLessonPage}
+          onLaunchDiagnostic={() => openQuiz(activeLesson.session, "diagnostic")}
+          onLaunchAssessment={() => openQuiz(activeLesson.session, "assessment")}
+          diagnostic={
+            diagnostic
+              ? { score: diagnostic.score, passed: diagnostic.passed, timestamp: diagnostic.timestamp }
+              : undefined
+          }
+          assessment={
+            assessment
+              ? { score: assessment.score, passed: assessment.passed, timestamp: assessment.timestamp }
+              : undefined
+          }
+          weaknesses={weaknesses}
+        />
+      );
+    } else {
+      content = (
+        <div className="min-h-screen bg-gradient-to-b from-indigo-50 via-white to-slate-100 pb-16">
+          <div className="mx-auto flex max-w-4xl flex-col items-center justify-center px-6 py-24 text-center">
+            <BookOpen className="h-10 w-10 text-indigo-400" />
+            <h2 className="mt-4 text-xl font-semibold text-indigo-600">Lesson not found</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              The requested lesson is no longer part of this plan. Return to the roadmap to select an available session.
+            </p>
+            <Button className="mt-6" onClick={closeLessonPage}>
+              Back to plan
+            </Button>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  return (
+    <>
+      {content}
       <QuizDialog
         open={quizState.open}
         title={quizState.mode === "diagnostic" ? "Diagnostic Quiz" : "Post-Session Test"}
@@ -955,7 +1072,7 @@ function App() {
         onClose={closeQuiz}
         onComplete={handleQuizComplete}
       />
-    </div>
+    </>
   );
 }
 
