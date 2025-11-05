@@ -64,7 +64,7 @@ export function QuizDialog({ open, title, mode, questions, onClose, onComplete }
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur"
+          className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/40 backdrop-blur"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -72,25 +72,26 @@ export function QuizDialog({ open, title, mode, questions, onClose, onComplete }
           aria-modal="true"
           aria-label={title}
         >
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 24 }}
-            className="w-full max-w-2xl"
-          >
-            <Card className="p-2">
-              <CardHeader>
-                <CardTitle className="text-xl font-bold text-indigo-600">{title}</CardTitle>
-                <p className="text-sm text-slate-500">
-                  {mode === "diagnostic"
-                    ? "Use this quick diagnostic to baseline your current knowledge before the session."
-                    : "Validate your learning outcomes with this post-session test."}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  {questions.map((question, index) => (
-                    <div key={question.id} className="rounded-2xl border border-indigo-100 bg-white/60 p-4 shadow-sm">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 24 }}
+              className="w-full max-w-2xl"
+            >
+              <Card className="flex max-h-[calc(100vh-4rem)] flex-col p-2">
+                <CardHeader className="shrink-0">
+                  <CardTitle className="text-xl font-bold text-indigo-600">{title}</CardTitle>
+                  <p className="text-sm text-slate-500">
+                    {mode === "diagnostic"
+                      ? "Use this quick diagnostic to baseline your current knowledge before the session."
+                      : "Validate your learning outcomes with this post-session test."}
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-6 overflow-y-auto pr-1">
+                  <div className="space-y-4">
+                    {questions.map((question, index) => (
+                      <div key={question.id} className="rounded-2xl border border-indigo-100 bg-white/60 p-4 shadow-sm">
                       <p className="text-sm font-semibold text-slate-700">
                         <span className="mr-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-500">{index + 1}</span>
                         {question.question}
@@ -167,9 +168,10 @@ export function QuizDialog({ open, title, mode, questions, onClose, onComplete }
                     )}
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
